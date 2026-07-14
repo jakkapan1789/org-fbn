@@ -18,8 +18,8 @@ interface AnnotateState {
 // within one stack would break connector alignment, so it is intentionally not offered).
 function annotateNode(node: OrgPerson, state: AnnotateState, inheritedSide: StackSide): AnnotateResult {
   const { query, collapsed, layoutOverrides, stackSides } = state;
-  const stackSide = stackSides[node.id] ?? inheritedSide;
-  const isCollapsed = !!collapsed[node.id];
+  const stackSide = stackSides[node.en] ?? inheritedSide;
+  const isCollapsed = !!collapsed[node.en];
   const selfMatches =
     !!query &&
     (node.name.toLowerCase().includes(query) ||
@@ -34,7 +34,7 @@ function annotateNode(node: OrgPerson, state: AnnotateState, inheritedSide: Stac
   });
 
   const expanded = query ? selfMatches || childMatches || !isCollapsed : !isCollapsed;
-  const layout = layoutOverrides[node.id] ?? node.childLayout;
+  const layout = layoutOverrides[node.en] ?? node.childLayout;
 
   const out: AnnotatedNode = {
     ...node,

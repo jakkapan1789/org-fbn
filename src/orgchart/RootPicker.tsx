@@ -6,7 +6,7 @@ import { isOrgSnapshot } from "./snapshot";
 import { getLevelMeta } from "./levelMeta";
 
 interface RootPickerProps {
-  onSelect: (id: string) => void;
+  onSelect: (en: string) => void;
   /** Loads a previously-exported .json directly as the current org, bypassing the live
    *  fetch entirely — the other way to "select" an org besides searching by EN. */
   onImport: (snapshot: OrgSnapshot) => void;
@@ -126,7 +126,7 @@ export function RootPicker({ onSelect, onImport }: RootPickerProps) {
             </div>
 
             <button
-              onClick={() => onSelect(person.id)}
+              onClick={() => onSelect(person.en)}
               className="mt-3.5 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-[#2E6FDB] text-[12.5px] font-semibold text-white hover:bg-[#1d55c0]"
             >
               สร้างผังองค์กร

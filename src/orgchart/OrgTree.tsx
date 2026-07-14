@@ -23,7 +23,7 @@ function flatten(
   compact: Set<string>,
   out: { node: AnnotatedNode; compact: boolean }[] = [],
 ): { node: AnnotatedNode; compact: boolean }[] {
-  out.push({ node, compact: compact.has(node.id) });
+  out.push({ node, compact: compact.has(node.en) });
   if (node.expanded) for (const child of node.children) flatten(child, compact, out);
   return out;
 }
@@ -66,9 +66,9 @@ export function OrgTree({
       </svg>
 
       {flat.map(({ node: n, compact }) => {
-        const box = layout.boxes.get(n.id)!;
+        const box = layout.boxes.get(n.en)!;
         return (
-          <div key={n.id} className="absolute" style={{ left: box.x, top: box.y }}>
+          <div key={n.en} className="absolute" style={{ left: box.x, top: box.y }}>
             <OrgCard node={n} compact={compact} {...shared} />
           </div>
         );

@@ -12,6 +12,7 @@ import type {
 import { DEFAULT_DISPLAY_OPTIONS } from "./types";
 import { fetchOrgTree, savePersonOverride } from "./api";
 import { annotate } from "./annotate";
+import { levelIndex } from "./levelMeta";
 import { usePersistentState } from "./usePersistentState";
 import {
   buildSnapshot,
@@ -37,7 +38,6 @@ const DISPLAY_OPTION_LABELS: { key: keyof DisplayOptions; label: string }[] = [
   { key: "showName", label: "ชื่อ" },
   { key: "showPosition", label: "ตำแหน่ง" },
   { key: "showHeadcount", label: "จำนวนทีม (ทุกระดับ)" },
-  { key: "showGrade", label: "เกรด/Level (B1, B2, …)" },
 ];
 
 // User edits (name/title/teamName/dept) merged over the fetched tree before annotation —
@@ -46,18 +46,18 @@ const DISPLAY_OPTION_LABELS: { key: keyof DisplayOptions; label: string }[] = [
 function applyOverrides(node: OrgPerson, overrides: Record<string, PersonOverride>): OrgPerson {
   return {
     ...node,
-    ...overrides[node.id],
+    ...overrides[node.en],
     children: node.children.map((c) => applyOverrides(c, overrides)),
   };
 }
 
-// Headcount per level index (0=Executive … 4=Team Member) for the LegendPanel summary —
+// Headcount per level tier (0=Executive … 4=Team Member) for the LegendPanel summary —
 // counts the whole current tree regardless of search/collapse state, matching what
 // `headcount` already means elsewhere in the app (every level below the root).
 function countByLevel(node: OrgPerson): number[] {
   const counts = [0, 0, 0, 0, 0];
   const walk = (n: OrgPerson) => {
-    counts[Math.min(n.level, counts.length - 1)]++;
+    counts[levelIndex(n.level)]++;
     n.children.forEach(walk);
   };
   walk(node);
@@ -76,25 +76,26 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
   const [treeLoading, setTreeLoading] = useState(false);
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [rootId, setRootId] = usePersistentState<string | null>("orgchart:rootId", null);
-  // Layout overrides are keyed by person id, so they survive switching roots too.
+  // The chosen root person's EN — the EN is the person identifier everywhere in the app.
+  const [rootEn, setRootEn] = usePersistentState<string | null>("orgchart:rootEn", null);
+  // Layout overrides are keyed by person EN, so they survive switching roots too.
   const [layoutOverrides, setLayoutOverrides] = usePersistentState<Record<string, LayoutDirection>>(
     "orgchart:layoutOverrides",
     {},
   );
-  // Which side each node's vertical stack hangs on, keyed by person id (default right).
+  // Which side each node's vertical stack hangs on, keyed by person EN (default right).
   const [stackSides, setStackSides] = usePersistentState<Record<string, StackSide>>("orgchart:stackSides", {});
-  // Live-edited fields (name/title/teamName), keyed by person id — survives root switches
+  // Live-edited fields (name/title/teamName), keyed by person EN — survives root switches
   // the same way layoutOverrides/stackSides do.
   const [personOverrides, setPersonOverrides] = usePersistentState<Record<string, PersonOverride>>(
     "orgchart:personOverrides",
     {},
   );
-  // Admin-deleted people (and, transitively, everyone under them) — a flat id set, global
+  // Admin-deleted people (and, transitively, everyone under them) — a flat EN set, global
   // across roots like the maps above, since deleting someone removes them from the org
   // wherever they'd otherwise appear.
-  const [deletedIds, setDeletedIds] = usePersistentState<string[]>("orgchart:deletedIds", []);
-  const deletedIdsSet = useMemo(() => new Set(deletedIds), [deletedIds]);
+  const [deletedEns, setDeletedEns] = usePersistentState<string[]>("orgchart:deletedEns", []);
+  const deletedEnsSet = useMemo(() => new Set(deletedEns), [deletedEns]);
   // A frozen Export snapshot loaded for Preview — bypasses the shared persisted overrides
   // above entirely (both directions: preview must never read admin's in-progress live
   // edits, and must never write back into the same localStorage keys the admin tab uses).
@@ -122,25 +123,25 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
   // "path info": which org this URL points at, and where to read it from. Read once on
   // mount — query params rather than a real route so the app still works on static hosting
   // with zero server-side rewrite config (see App.tsx for both routes).
-  const { urlOrgId, fileTitle } = useMemo(() => {
+  const { urlOrgEn, fileTitle } = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     return {
-      urlOrgId: params.get("org"),
+      urlOrgEn: params.get("org"),
       // ?source=jsonfile&title=… — read the published file, never localStorage or live data.
       fileTitle: params.get("source") === "jsonfile" ? params.get("title") : null,
     };
   }, []);
 
-  function syncUrlOrgId(id: string | null) {
+  function syncUrlOrgEn(en: string | null) {
     const url = new URL(window.location.href);
-    if (id) url.searchParams.set("org", id);
+    if (en) url.searchParams.set("org", en);
     else url.searchParams.delete("org");
     window.history.replaceState(null, "", url);
   }
 
   useEffect(() => {
     // File-backed preview: the .json under public/orgs/ is the whole source of truth, so
-    // this branch never touches rootId, localStorage, or api.ts. A missing/invalid file
+    // this branch never touches rootEn, localStorage, or api.ts. A missing/invalid file
     // leaves `tree` null and the empty state explains which title failed.
     if (fileTitle !== null) {
       setTreeLoading(true);
@@ -154,47 +155,69 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
       return;
     }
 
-    const initialId = urlOrgId ?? rootId;
-    if (!initialId) return;
+    const initialEn = urlOrgEn ?? rootEn;
+    if (!initialEn) return;
     setTreeLoading(true);
 
     if (readOnly) {
       // Fast path: an exported snapshot renders instantly with no fetch at all. No
       // snapshot yet for this org → fall back to live data, same as before this feature.
-      const snapshot = loadSnapshot(initialId);
+      const snapshot = loadSnapshot(initialEn);
       if (snapshot) {
         setPreviewSnapshot(snapshot);
         setTree(snapshot.tree);
         setTreeLoading(false);
         return;
       }
-      fetchOrgTree(initialId)
-        .then(setTree)
+      fetchOrgTree(initialEn)
+        .then(({ tree, snapshot }) => {
+          if (snapshot) setPreviewSnapshot(snapshot);
+          setTree(tree);
+        })
         .catch(() => {})
         .finally(() => setTreeLoading(false));
       return;
     }
 
-    if (urlOrgId && urlOrgId !== rootId) setRootId(urlOrgId);
-    fetchOrgTree(initialId)
-      .then(setTree)
-      .catch(() => setRootId(null))
+    if (urlOrgEn && urlOrgEn !== rootEn) setRootEn(urlOrgEn);
+    fetchOrgTree(initialEn)
+      .then(({ tree, snapshot }) => {
+        setTree(tree);
+        if (snapshot) applySnapshotSettings(snapshot);
+      })
+      .catch(() => setRootEn(null))
       .finally(() => setTreeLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restore
   }, []);
 
-  async function selectRoot(id: string) {
-    setRootId(id);
+  // A snapshot-shaped API response carries the chart customization saved server-side —
+  // adopt its layout/side maps and display options the same way importing the exported
+  // .json does, so a single endpoint restores the whole chart, not just the people.
+  function applySnapshotSettings(snapshot: OrgSnapshot) {
+    setLayoutOverrides(snapshot.layoutOverrides ?? {});
+    setStackSides(snapshot.stackSides ?? {});
+    if (snapshot.displayOptions) {
+      setDisplayOptions((prev) => {
+        const merged = { ...DEFAULT_DISPLAY_OPTIONS, ...snapshot.displayOptions };
+        return merged.showAvatar || merged.showName || merged.showPosition ? merged : prev;
+      });
+    }
+  }
+
+  async function selectRoot(en: string) {
+    setRootEn(en);
     setTreeLoading(true);
     setTree(null);
     setSelectedNode(null);
     setCollapsed({});
     setSearchQuery("");
-    syncUrlOrgId(id);
+    syncUrlOrgEn(en);
     try {
-      setTree(await fetchOrgTree(id));
+      const { tree, snapshot } = await fetchOrgTree(en);
+      setTree(tree);
+      if (snapshot) applySnapshotSettings(snapshot);
     } catch {
-      setRootId(null);
+      setRootEn(null);
     } finally {
       setTreeLoading(false);
     }
@@ -202,11 +225,11 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
 
   // Loads a previously-exported .json directly, skipping api.ts entirely — the file's
   // `tree` already has that session's edits/deletions baked in, so personOverrides/
-  // deletedIds reset rather than layering the *current* browser's unrelated customizations
+  // deletedEns reset rather than layering the *current* browser's unrelated customizations
   // on top of someone else's export. Also refreshes the localStorage snapshot copy, so
   // Preview works immediately even on a browser that never ran Export for this org.
   function importSnapshot(snapshot: OrgSnapshot) {
-    setRootId(snapshot.orgId);
+    setRootEn(snapshot.orgId);
     setTree(snapshot.tree);
     setLayoutOverrides(snapshot.layoutOverrides ?? {});
     setStackSides(snapshot.stackSides ?? {});
@@ -215,34 +238,34 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
       return merged.showAvatar || merged.showName || merged.showPosition ? merged : prev;
     });
     setPersonOverrides({});
-    setDeletedIds([]);
+    setDeletedEns([]);
     setSelectedNode(null);
     setCollapsed({});
     setSearchQuery("");
     setTreeLoading(false);
-    syncUrlOrgId(snapshot.orgId);
+    syncUrlOrgEn(snapshot.orgId);
     saveSnapshot(snapshot);
   }
 
   function resetRoot() {
-    setRootId(null);
+    setRootEn(null);
     setTree(null);
     setSelectedNode(null);
     setSettingsOpen(false);
-    syncUrlOrgId(null);
+    syncUrlOrgEn(null);
   }
 
   function openPreview() {
-    if (!rootId) return;
+    if (!rootEn) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("mode"); // no mode = read-only preview, the default route
-    url.searchParams.set("org", rootId);
+    url.searchParams.set("org", rootEn);
     window.open(url.toString(), "_blank", "noopener");
   }
 
   function handleExport(title: string) {
-    if (!rootId || !treeWithOverrides) return;
-    const snapshot = buildSnapshot(rootId, title, treeWithOverrides, layoutOverrides, stackSides, displayOptions);
+    if (!rootEn || !treeWithOverrides) return;
+    const snapshot = buildSnapshot(rootEn, title, treeWithOverrides, layoutOverrides, stackSides, displayOptions);
     saveSnapshot(snapshot);
     downloadSnapshotFile(snapshot);
     // Straight to the read-only link — the blob download above has already started, so
@@ -250,27 +273,27 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
     // destination read-only: no mode = preview, the default route.
     const url = new URL(window.location.href);
     url.searchParams.delete("mode");
-    url.searchParams.set("org", rootId);
+    url.searchParams.set("org", rootEn);
     window.location.assign(url.toString());
   }
 
   // Seeded from the previous Export of this org, else from the root person — the admin
   // renaming a chart on every re-export would silently orphan the published file.
   function defaultExportTitle(): string {
-    if (!rootId || !treeWithOverrides) return "";
-    return loadSnapshot(rootId)?.title || slugifyTitle(`${treeWithOverrides.dept} ${treeWithOverrides.name}`);
+    if (!rootEn || !treeWithOverrides) return "";
+    return loadSnapshot(rootEn)?.title || slugifyTitle(`${treeWithOverrides.dept} ${treeWithOverrides.name}`);
   }
 
-  function deletePerson(id: string) {
-    setDeletedIds((ids) => (ids.includes(id) ? ids : [...ids, id]));
-    setSelectedNode((prev) => (prev && prev.id === id ? null : prev));
+  function deletePerson(en: string) {
+    setDeletedEns((ens) => (ens.includes(en) ? ens : [...ens, en]));
+    setSelectedNode((prev) => (prev && prev.en === en ? null : prev));
   }
 
   const treeWithOverrides = useMemo(() => {
     if (!tree) return null;
     if (previewSnapshot) return tree; // already final as of export — never re-derived
-    return applyOverrides(pruneDeleted(tree, deletedIdsSet), personOverrides);
-  }, [tree, personOverrides, deletedIdsSet, previewSnapshot]);
+    return applyOverrides(pruneDeleted(tree, deletedEnsSet), personOverrides);
+  }, [tree, personOverrides, deletedEnsSet, previewSnapshot]);
 
   const effectiveLayoutOverrides = previewSnapshot ? previewSnapshot.layoutOverrides : layoutOverrides;
   const effectiveStackSides = previewSnapshot ? previewSnapshot.stackSides : stackSides;
@@ -285,27 +308,27 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
 
   const levelCounts = useMemo(() => (treeWithOverrides ? countByLevel(treeWithOverrides) : []), [treeWithOverrides]);
 
-  function toggleNode(id: string) {
-    setCollapsed((c) => ({ ...c, [id]: !c[id] }));
+  function toggleNode(en: string) {
+    setCollapsed((c) => ({ ...c, [en]: !c[en] }));
   }
 
-  function toggleLayout(id: string, next: LayoutDirection) {
-    setLayoutOverrides((o) => ({ ...o, [id]: next }));
+  function toggleLayout(en: string, next: LayoutDirection) {
+    setLayoutOverrides((o) => ({ ...o, [en]: next }));
   }
 
-  function toggleSide(id: string, next: StackSide) {
-    setStackSides((s) => ({ ...s, [id]: next }));
+  function toggleSide(en: string, next: StackSide) {
+    setStackSides((s) => ({ ...s, [en]: next }));
   }
 
-  function savePerson(id: string, updates: PersonOverride) {
-    setPersonOverrides((o) => ({ ...o, [id]: { ...o[id], ...updates } }));
+  function savePerson(en: string, updates: PersonOverride) {
+    setPersonOverrides((o) => ({ ...o, [en]: { ...o[en], ...updates } }));
     // Reflect the edit in the open modal immediately, without waiting on the tree/annotate
     // recompute — same node reference otherwise, so the modal wouldn't show new values.
-    setSelectedNode((prev) => (prev && prev.id === id ? { ...prev, ...updates } : prev));
+    setSelectedNode((prev) => (prev && prev.en === en ? { ...prev, ...updates } : prev));
     // Best-effort sync to a real backend when one is connected (see api.ts /
     // apiConfig.ts) — localStorage above already has the edit either way, so a failed
     // or absent backend must never block editing.
-    savePersonOverride(id, updates).catch(() => {});
+    savePersonOverride(en, updates).catch(() => {});
   }
 
   function toggleDisplayOption(key: keyof DisplayOptions) {
@@ -521,7 +544,7 @@ export function OrgChart({ readOnly = false }: OrgChartProps) {
                 onClose={() => setSelectedNode(null)}
                 onSave={savePerson}
                 onDelete={deletePerson}
-                canDelete={!editingDisabled && selectedNode.id !== rootId}
+                canDelete={!editingDisabled && selectedNode.en !== rootEn}
                 readOnly={editingDisabled}
               />
             )}

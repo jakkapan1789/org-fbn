@@ -8,7 +8,7 @@ const SNAPSHOT_DIR = "orgs";
 
 export function isOrgSnapshot(value: unknown): value is OrgSnapshot {
   const v = value as Partial<OrgSnapshot> | null;
-  return !!v && typeof v.orgId === "string" && !!v.tree && typeof v.tree.id === "string";
+  return !!v && typeof v.orgId === "string" && !!v.tree && typeof v.tree.en === "string";
 }
 
 /** Turns an admin-typed chart name into something safe to use as both a file name and a
@@ -29,23 +29,23 @@ export function snapshotFileUrl(title: string): string {
 }
 
 /** Removes deleted people (and, transitively, everyone under them) from a tree. Admin-only
- *  customization — `deletedIds` is a flat id set, so deleting a manager silently drops
+ *  customization — `deletedEns` is a flat EN set, so deleting a manager silently drops
  *  their whole reporting line without needing to touch anyone else's record. */
-export function pruneDeleted(node: OrgPerson, deletedIds: Set<string>): OrgPerson {
+export function pruneDeleted(node: OrgPerson, deletedEns: Set<string>): OrgPerson {
   return {
     ...node,
-    children: node.children.filter((c) => !deletedIds.has(c.id)).map((c) => pruneDeleted(c, deletedIds)),
+    children: node.children.filter((c) => !deletedEns.has(c.en)).map((c) => pruneDeleted(c, deletedEns)),
   };
 }
 
-function collectIds(node: OrgPerson, out: Set<string>) {
-  out.add(node.id);
-  node.children.forEach((c) => collectIds(c, out));
+function collectEns(node: OrgPerson, out: Set<string>) {
+  out.add(node.en);
+  node.children.forEach((c) => collectEns(c, out));
 }
 
 /** Freezes the admin's current customization (edited/deleted tree + layout/stackSide
  *  choices) into a self-contained snapshot the Preview page can render without hitting
- *  api.ts at all. Layout/stackSide maps are trimmed to ids still present in the tree so
+ *  api.ts at all. Layout/stackSide maps are trimmed to ENs still present in the tree so
  *  the file doesn't carry stale entries for people who were since deleted. */
 export function buildSnapshot(
   orgId: string,
@@ -55,14 +55,14 @@ export function buildSnapshot(
   stackSides: Record<string, StackSide>,
   displayOptions: DisplayOptions,
 ): OrgSnapshot {
-  const ids = new Set<string>();
-  collectIds(tree, ids);
+  const ens = new Set<string>();
+  collectEns(tree, ens);
 
   const trimmedLayout: Record<string, LayoutDirection> = {};
-  for (const [id, v] of Object.entries(layoutOverrides)) if (ids.has(id)) trimmedLayout[id] = v;
+  for (const [en, v] of Object.entries(layoutOverrides)) if (ens.has(en)) trimmedLayout[en] = v;
 
   const trimmedSides: Record<string, StackSide> = {};
-  for (const [id, v] of Object.entries(stackSides)) if (ids.has(id)) trimmedSides[id] = v;
+  for (const [en, v] of Object.entries(stackSides)) if (ens.has(en)) trimmedSides[en] = v;
 
   return {
     orgId,

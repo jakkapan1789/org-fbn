@@ -34,7 +34,7 @@ export function PersonModal({ node, onClose, onSave, onDelete, canDelete = false
   }
 
   function save() {
-    onSave(node.id, {
+    onSave(node.en, {
       name: draftName.trim() || node.name,
       title: draftTitle.trim() || node.title,
       teamName: draftTeamName.trim() || undefined,
@@ -153,7 +153,7 @@ export function PersonModal({ node, onClose, onSave, onDelete, canDelete = false
                 <button
                   onClick={() => {
                     if (window.confirm(`ลบ ${node.name} ออกจากผังนี้? ลูกทีมทั้งหมด (${node.headcount} คน) จะถูกลบไปด้วย และย้อนกลับไม่ได้`)) {
-                      onDelete(node.id);
+                      onDelete(node.en);
                       onClose();
                     }
                   }}

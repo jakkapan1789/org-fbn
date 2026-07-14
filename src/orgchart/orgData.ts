@@ -18,17 +18,18 @@ const IC_TITLES = [
   "Senior Software Engineer", "QA Engineer", "Data Analyst",
 ];
 
-// Job grade/band per hierarchy level — a separate axis from `level` (which only drives
-// card colour): two Team Members can both be "level 4" but sit at different bands.
-const GRADES_BY_LEVEL: Record<number, string[]> = {
+// Level code pool per hierarchy tier (0=Executive … 4=Team Member). The code's letter
+// prefix maps back to the tier (see levelMeta.ts); the digit is the band within it, so
+// two Team Members on the same tier can still be "B1" vs "B3".
+const LEVEL_CODES_BY_TIER: Record<number, string[]> = {
   0: ["C1"],
   1: ["V1", "V2"],
   2: ["D1", "D2"],
   3: ["M1", "M2", "M3"],
   4: ["B1", "B2", "B3", "B4"],
 };
-function gradeFor(level: number, seed: number): string {
-  const pool = GRADES_BY_LEVEL[level] ?? GRADES_BY_LEVEL[4];
+function levelCodeFor(tier: number, seed: number): string {
+  const pool = LEVEL_CODES_BY_TIER[tier] ?? LEVEL_CODES_BY_TIER[4];
   return pool[seed % pool.length];
 }
 
@@ -37,11 +38,11 @@ let counter = 0;
 function nextPerson() {
   const f = FIRST_NAMES[counter % FIRST_NAMES.length];
   const l = LAST_NAMES[Math.floor(counter / FIRST_NAMES.length) % LAST_NAMES.length];
-  const id = "n" + counter;
+  const seed = counter;
   const en = "EN" + String(counter + 1).padStart(5, "0");
   counter++;
   return {
-    id,
+    seed,
     en,
     name: f + " " + l.charAt(0) + ".",
     initials: f[0] + l[0],
@@ -50,10 +51,9 @@ function nextPerson() {
   };
 }
 
-function makePerson(level: number, title: string, dept: string): OrgPerson {
-  const p = nextPerson();
-  const seed = Number(p.id.slice(1));
-  return { ...p, level, title, dept, children: [], headcount: 0, childLayout: "horizontal", grade: gradeFor(level, seed) };
+function makePerson(tier: number, title: string, dept: string): OrgPerson {
+  const { seed, ...p } = nextPerson();
+  return { ...p, level: levelCodeFor(tier, seed), title, dept, children: [], headcount: 0, childLayout: "horizontal" };
 }
 
 // Attach computed fields: headcount (total reports below) and childLayout,

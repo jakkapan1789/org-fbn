@@ -35,7 +35,7 @@ export interface ConnectorLine {
 
 export interface LayoutResult {
   boxes: Map<string, Box>;
-  /** ids of nodes that should render as a compact stack-row card. */
+  /** ENs of nodes that should render as a compact stack-row card. */
   compact: Set<string>;
   lines: ConnectorLine[];
   width: number;
@@ -165,14 +165,14 @@ function normalise(
 
 function layoutSubtree(node: AnnotatedNode, y: number, cardHeight: number, compactSelf: boolean): Subtree {
   const ownBox: Box = { x: 0, y, w: CARD_WIDTH, h: cardHeight };
-  const selfCompact = new Set<string>(compactSelf ? [node.id] : []);
+  const selfCompact = new Set<string>(compactSelf ? [node.en] : []);
   const verticalChildren = compactSelf || node.layoutVertical;
   const arrangement = arrangementOf(node, verticalChildren);
   const showChildren = node.expanded && node.children.length > 0;
 
   if (!showChildren) {
     const result = normalise(ownBox, [], [], [], selfCompact);
-    result.boxes.set(node.id, result.ownBox);
+    result.boxes.set(node.en, result.ownBox);
     return result;
   }
 
@@ -219,7 +219,7 @@ function layoutSubtree(node: AnnotatedNode, y: number, cardHeight: number, compa
       { y0: busY, y1: busY + 0.001, x: busRight },
     ];
     const result = normalise(box, placed, lines, busContour, selfCompact);
-    result.boxes.set(node.id, result.ownBox);
+    result.boxes.set(node.en, result.ownBox);
     return result;
   }
 
@@ -241,7 +241,7 @@ function layoutSubtree(node: AnnotatedNode, y: number, cardHeight: number, compa
     cl = shift(cl, -cl.ownBox.x, 0);
     const line: ConnectorLine = { x1: trunkX, y1: y + cardHeight, x2: trunkX, y2: cl.ownBox.y };
     const result = normalise(ownBox, [cl], [line], [], selfCompact);
-    result.boxes.set(node.id, result.ownBox);
+    result.boxes.set(node.en, result.ownBox);
     return result;
   }
 
@@ -323,7 +323,7 @@ function layoutSubtree(node: AnnotatedNode, y: number, cardHeight: number, compa
   connectColumn(rightPlaced, "right");
 
   const result = normalise(ownBox, [...leftPlaced, ...rightPlaced], lines, trunkContour, selfCompact);
-  result.boxes.set(node.id, result.ownBox);
+  result.boxes.set(node.en, result.ownBox);
   return result;
 }
 

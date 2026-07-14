@@ -111,23 +111,15 @@ export function OrgCard({
           {displayOptions.showName && (
             <div className="max-w-full truncate text-[11.5px] font-semibold leading-tight text-[#0f1c2e]">{node.name}</div>
           )}
-          {(displayOptions.showPosition || (displayOptions.showGrade && node.grade)) && (
+          {displayOptions.showPosition && (
             <div className="flex max-w-full items-center gap-1">
               {/* Position = the person's actual title (VP, Director, Lead System Analyst, …), colored by level. */}
-              {displayOptions.showPosition && (
-                <span
-                  className="inline-flex min-w-0 items-center rounded-full px-1.5 py-px text-[8px] font-semibold uppercase tracking-[.03em]"
-                  style={{ background: chipBg, color: meta.color }}
-                >
-                  <span className="truncate">{node.title}</span>
-                </span>
-              )}
-              {/* Grade/band — a separate axis from `level` (two Team Members can be B1 vs B3). */}
-              {displayOptions.showGrade && node.grade && (
-                <span className="shrink-0 rounded-full bg-[#eef1f6] px-1.5 py-px text-[8px] font-semibold text-[#5f6b7e]">
-                  {node.grade}
-                </span>
-              )}
+              <span
+                className="inline-flex min-w-0 items-center rounded-full px-1.5 py-px text-[8px] font-semibold uppercase tracking-[.03em]"
+                style={{ background: chipBg, color: meta.color }}
+              >
+                <span className="truncate">{node.title}</span>
+              </span>
             </div>
           )}
         </div>
@@ -139,7 +131,7 @@ export function OrgCard({
           title={node.layoutHorizontal ? "สลับลูกทีมเป็นแนวตั้ง" : "สลับลูกทีมเป็นแนวนอน"}
           onClick={(e) => {
             e.stopPropagation();
-            onToggleLayout(node.id, node.layoutHorizontal ? "vertical" : "horizontal");
+            onToggleLayout(node.en, node.layoutHorizontal ? "vertical" : "horizontal");
           }}
           className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-[#dbe1ea] bg-white p-0 text-[#42506a] hover:border-[#2E6FDB] hover:text-[#2E6FDB]"
           style={{ boxShadow: "0 1px 4px rgba(16,24,40,0.12)" }}
@@ -162,7 +154,7 @@ export function OrgCard({
           }
           onClick={(e) => {
             e.stopPropagation();
-            onToggleSide(node.id, node.stackSide === "right" ? "left" : "right");
+            onToggleSide(node.en, node.stackSide === "right" ? "left" : "right");
           }}
           className={`absolute top-1/2 -translate-y-1/2 ${sidePosition} flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-[#dbe1ea] bg-white p-0 text-[#42506a] hover:border-[#2E6FDB] hover:text-[#2E6FDB]`}
           style={{ boxShadow: "0 1px 4px rgba(16,24,40,0.12)" }}
@@ -176,7 +168,7 @@ export function OrgCard({
           data-chevron
           onClick={(e) => {
             e.stopPropagation();
-            onToggle(node.id);
+            onToggle(node.en);
           }}
           onMouseEnter={() => setChevronHovered(true)}
           onMouseLeave={() => setChevronHovered(false)}
