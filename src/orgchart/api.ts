@@ -15,6 +15,28 @@ import { isOrgSnapshot } from "./snapshot";
 
 const employeePath = (empNo: string) => `/employee/?empNo=${encodeURIComponent(empNo)}`;
 
+/** Recursively lowercases the first letter of every object key. The real backend answers
+ *  in PascalCase (`OrgId`, `En`, `TeamName`, `ChildLayout`, ...), while every type in
+ *  ./types and every localStorage/UI key in the app is camelCase — applied once, right
+ *  after parsing, so nothing downstream needs to know the wire format differs. A no-op
+ *  on keys that are already camelCase, so it's safe even if the backend changes later. */
+function camelizeKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(camelizeKeys);
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      out[key.charAt(0).toLowerCase() + key.slice(1)] = camelizeKeys(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+async function fetchEmployee(empNo: string): Promise<OrgPerson | OrgSnapshot> {
+  const raw = await apiFetch<unknown>(employeePath(empNo));
+  return camelizeKeys(raw) as OrgPerson | OrgSnapshot;
+}
+
 /** Unwraps the employee endpoint's two response shapes to the tree root. */
 function treeOf(data: OrgPerson | OrgSnapshot): OrgPerson {
   return isOrgSnapshot(data) ? data.tree : data;
@@ -28,7 +50,7 @@ export async function findPersonByEn(en: string): Promise<PersonSummary | null> 
   if (!query) return null;
 
   try {
-    const data = await apiFetch<OrgPerson | OrgSnapshot>(employeePath(query));
+    const data = await fetchEmployee(query);
     const root = treeOf(data);
     if (!root || typeof root.en !== "string") return null; // 200 but not a person we understand
     const { en: personEn, name, initials, title, dept, level, headcount } = root;
@@ -51,7 +73,7 @@ export interface OrgTreeResult {
  *  OrgPerson or an exported-snapshot wrapper (`{ orgId, tree, layoutOverrides,
  *  stackSides, displayOptions }`) — both shapes are accepted. */
 export async function fetchOrgTree(rootEn: string): Promise<OrgTreeResult> {
-  const data = await apiFetch<OrgPerson | OrgSnapshot>(employeePath(rootEn));
+  const data = await fetchEmployee(rootEn);
   return isOrgSnapshot(data) ? { tree: data.tree, snapshot: data } : { tree: data, snapshot: null };
 }
 
