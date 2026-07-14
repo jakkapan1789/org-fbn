@@ -21,6 +21,7 @@ export function PersonModal({ node, onClose, onSave, onDelete, canDelete = false
   const [draftName, setDraftName] = useState(node.name);
   const [draftTitle, setDraftTitle] = useState(node.title);
   const [draftTeamName, setDraftTeamName] = useState(node.teamName ?? "");
+  const [avatarError, setAvatarError] = useState(false);
 
   const meta = getLevelMeta(node.level);
   const chipBg = meta.color + "17";
@@ -72,12 +73,22 @@ export function PersonModal({ node, onClose, onSave, onDelete, canDelete = false
 
         <div className="px-[30px] pb-[22px] pt-[30px]">
           <div className="flex items-center gap-4">
-            <div
-              className="flex h-[70px] w-[70px] shrink-0 items-center justify-center rounded-[19px] text-2xl font-bold text-white"
-              style={{ background: avatarGrad, boxShadow: `0 8px 20px ${meta.shadow}` }}
-            >
-              {node.initials}
-            </div>
+            {node.avatarUrl && !avatarError ? (
+              <img
+                src={node.avatarUrl}
+                alt={node.name}
+                onError={() => setAvatarError(true)}
+                className="h-[70px] w-[70px] shrink-0 rounded-[19px] object-cover"
+                style={{ boxShadow: `0 8px 20px ${meta.shadow}` }}
+              />
+            ) : (
+              <div
+                className="flex h-[70px] w-[70px] shrink-0 items-center justify-center rounded-[19px] text-2xl font-bold text-white"
+                style={{ background: avatarGrad, boxShadow: `0 8px 20px ${meta.shadow}` }}
+              >
+                {node.initials}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               {editing ? (
                 <div className="flex flex-col gap-2">

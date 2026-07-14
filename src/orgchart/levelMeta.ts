@@ -17,6 +17,22 @@ export function levelIndex(level: string): number {
   return TIER_BY_PREFIX[String(level).charAt(0).toUpperCase()] ?? 4;
 }
 
+// Within the Team Member tier (B), the senior bands get their own colour instead of the
+// flat Team Member grey — B3+ yellow, B4+ green (B4 wins since it satisfies both). Only
+// affects card colouring (avatar/badge/border); LEVEL_META and the Legend panel's five
+// tier rows are untouched.
+const BAND_OVERRIDE: { min: number; meta: Omit<LevelMeta, "name"> }[] = [
+  { min: 4, meta: { color: "#16a34a", grad: ["#4ade80", "#16a34a"], shadow: "rgba(22,163,74,0.3)" } },
+  { min: 3, meta: { color: "#d99a06", grad: ["#f5c344", "#d99a06"], shadow: "rgba(217,154,6,0.32)" } },
+];
+
 export function getLevelMeta(level: string): LevelMeta {
-  return LEVEL_META[levelIndex(level)];
+  const code = String(level);
+  const base = LEVEL_META[levelIndex(code)];
+  if (code.charAt(0).toUpperCase() === "B") {
+    const band = Number(code.slice(1));
+    const override = BAND_OVERRIDE.find((o) => band >= o.min);
+    if (override) return { ...base, ...override.meta };
+  }
+  return base;
 }

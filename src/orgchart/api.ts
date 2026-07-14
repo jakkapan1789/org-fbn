@@ -53,8 +53,8 @@ export async function findPersonByEn(en: string): Promise<PersonSummary | null> 
     const data = await fetchEmployee(query);
     const root = treeOf(data);
     if (!root || typeof root.en !== "string") return null; // 200 but not a person we understand
-    const { en: personEn, name, initials, title, dept, level, headcount } = root;
-    return { en: personEn, name, initials, title, dept, level, headcount };
+    const { en: personEn, name, initials, avatarUrl, title, dept, level, headcount } = root;
+    return { en: personEn, name, initials, avatarUrl, title, dept, level, headcount };
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;

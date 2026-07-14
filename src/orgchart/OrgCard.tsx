@@ -34,6 +34,9 @@ export function OrgCard({
 }: OrgCardProps) {
   const [hovered, setHovered] = useState(false);
   const [chevronHovered, setChevronHovered] = useState(false);
+  // Falls back to the initials-on-gradient avatar when there's no photo URL, or the URL
+  // fails to load (broken link, 404, ...) — never leave a blank box.
+  const [avatarError, setAvatarError] = useState(false);
 
   // Side toggle: on a stack member (compact) it moves that card to the other column of
   // its parent's split; on a non-compact vertical parent it sets the default column its
@@ -86,12 +89,22 @@ export function OrgCard({
 
       {displayOptions.showAvatar && (
         <div className="relative shrink-0">
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[10.5px] font-bold text-white"
-            style={{ background: avatarGrad, boxShadow: `0 2px 6px ${meta.shadow}` }}
-          >
-            {node.initials}
-          </div>
+          {node.avatarUrl && !avatarError ? (
+            <img
+              src={node.avatarUrl}
+              alt={node.name}
+              onError={() => setAvatarError(true)}
+              className="h-7 w-7 rounded-md object-cover"
+              style={{ boxShadow: `0 2px 6px ${meta.shadow}` }}
+            />
+          ) : (
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-md text-[10.5px] font-bold text-white"
+              style={{ background: avatarGrad, boxShadow: `0 2px 6px ${meta.shadow}` }}
+            >
+              {node.initials}
+            </div>
+          )}
           {/* Team size, badged on the avatar corner rather than taking its own row —
               180px cards have no room to spare, and this reads fine at a glance. */}
           {showHeadcountBadge && (
@@ -109,7 +122,9 @@ export function OrgCard({
       {(displayOptions.showName || displayOptions.showPosition) && (
         <div className="flex min-w-0 flex-col items-start gap-1">
           {displayOptions.showName && (
-            <div className="max-w-full truncate text-[11.5px] font-semibold leading-tight text-[#0f1c2e]">{node.name}</div>
+            <div className="max-w-full truncate text-[11.5px] font-semibold leading-tight text-[#0f1c2e]">
+              {node.name.split(" ")[0]}
+            </div>
           )}
           {displayOptions.showPosition && (
             <div className="flex max-w-full items-center gap-1">

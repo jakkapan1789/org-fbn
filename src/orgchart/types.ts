@@ -6,6 +6,10 @@ export interface OrgPerson {
   en: string;
   name: string;
   initials: string;
+  /** Photo URL from the backend (`AvatarUrl`, normalized to camelCase by api.ts). When
+   *  absent or the image fails to load, every avatar falls back to `initials` on a
+   *  level-coloured gradient. */
+  avatarUrl?: string;
   email: string;
   phone: string;
   /** Grade/band code, e.g. "C1", "V2", "D1", "M3", "B2". The letter prefix is the
@@ -46,6 +50,7 @@ export interface PersonSummary {
   en: string;
   name: string;
   initials: string;
+  avatarUrl?: string;
   title: string;
   dept: string;
   level: string;

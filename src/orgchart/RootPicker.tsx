@@ -24,6 +24,7 @@ export function RootPicker({ onSelect, onImport }: RootPickerProps) {
   const [en, setEn] = useState("");
   const [search, setSearch] = useState<SearchState>({ status: "idle" });
   const [importError, setImportError] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Only the newest search may write to state — an admin who edits the EN and searches
   // again must never see the slower earlier lookup's answer land on top.
@@ -34,6 +35,7 @@ export function RootPicker({ onSelect, onImport }: RootPickerProps) {
     if (!en.trim()) return;
     const seq = ++searchSeq.current;
     setSearch({ status: "loading" });
+    setAvatarError(false);
     try {
       const person = await findPersonByEn(en);
       if (seq === searchSeq.current) setSearch({ status: "done", person });
@@ -102,12 +104,21 @@ export function RootPicker({ onSelect, onImport }: RootPickerProps) {
         {person && meta && (
           <div className="mt-3 rounded-[12px] border border-[#e4e8ee] bg-[#f9fafc] p-3.5">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold text-white"
-                style={{ background: `linear-gradient(140deg, ${meta.grad[0]}, ${meta.grad[1]})` }}
-              >
-                {person.initials}
-              </div>
+              {person.avatarUrl && !avatarError ? (
+                <img
+                  src={person.avatarUrl}
+                  alt={person.name}
+                  onError={() => setAvatarError(true)}
+                  className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                />
+              ) : (
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[12px] font-bold text-white"
+                  style={{ background: `linear-gradient(140deg, ${meta.grad[0]}, ${meta.grad[1]})` }}
+                >
+                  {person.initials}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px] font-semibold text-[#0f1c2e]">{person.name}</div>
                 <div className="truncate text-[11.5px] text-[#8b97a8]">
